@@ -54,7 +54,11 @@ func NewFilter(filter any) (Filter, error) {
 		index++
 	}
 
-	return andFilter{Filters: filters}, nil
+	if len(filters) == 1 {
+		return filters[0], nil
+	} else {
+		return andFilter{Filters: filters}, nil
+	}
 }
 
 type wrappedFilter struct {
@@ -80,6 +84,13 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 	for key, value := range f {
 		var filter Filter
 		switch key {
+		case "$not":
+			f, err := newWrappedFilter("", value)
+			if err != nil {
+				return nil, err
+			}
+
+			filter = notFilter{Filter: f}
 		case "$nin":
 			f, err := newInFilter(false, value)
 			if err != nil {
@@ -135,7 +146,12 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 		filters[index] = filter
 		index++
 	}
-	return wrappedFilter{Path: parts, Filter: andFilter{Filters: filters}}, nil
+
+	if len(filters) == 1 {
+		return wrappedFilter{Path: parts, Filter: filters[0]}, nil
+	} else {
+		return wrappedFilter{Path: parts, Filter: andFilter{Filters: filters}}, nil
+	}
 }
 
 type andFilter struct {
@@ -156,14 +172,18 @@ func (f andFilter) Match(document any) bool {
 	return true
 }
 
-func newAndFilter(filter any) (andFilter, error) {
+func newAndFilter(filter any) (Filter, error) {
 	filters, err := newAndOrFilter(filter)
 
 	if err != nil {
 		return andFilter{}, err
 	}
 
-	return andFilter{Filters: filters}, nil
+	if len(filters) == 1 {
+		return filters[0], nil
+	} else {
+		return andFilter{Filters: filters}, nil
+	}
 }
 
 type orFilter struct {
@@ -181,14 +201,18 @@ func (f orFilter) Match(document any) bool {
 	return f.Invert
 }
 
-func newOrFilter(invert bool, filter any) (orFilter, error) {
+func newOrFilter(invert bool, filter any) (Filter, error) {
 	filters, err := newAndOrFilter(filter)
 
 	if err != nil {
 		return orFilter{}, err
 	}
 
-	return orFilter{Invert: invert, Filters: filters}, nil
+	if len(filters) == 1 {
+		return filters[0], nil
+	} else {
+		return orFilter{Invert: invert, Filters: filters}, nil
+	}
 }
 
 func newAndOrFilter(filter any) ([]Filter, error) {
@@ -261,7 +285,16 @@ func newInFilter(in bool, values any) (Filter, error) {
 	return f, nil
 }
 
-// not nor
+type notFilter struct {
+	Filter Filter
+}
+
+func (f notFilter) Match(document any) bool {
+	m := f.Filter.Match(document)
+	return !m
+}
+
+// TODO
 // regex
 // all
 
@@ -316,6 +349,10 @@ func matchNumeric[A numeric](f numberToNumberFilter[A], n A) bool {
 
 func getInPath(document any, path []string) any {
 	for _, key := range path {
+		if key == "" {
+			break
+		}
+
 		m, ok := document.(map[string]any)
 
 		if !ok {

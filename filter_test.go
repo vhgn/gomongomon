@@ -162,6 +162,29 @@ func TestFilter(t *testing.T) {
 			t.Error("Nin does not reject")
 		}
 	})
+
+	t.Run("Not filter works", func(t *testing.T) {
+		f, e := gm.NewFilter(M{
+			"a": M{
+				"$not": M{
+					"$eq": 1,
+				},
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m := f.Match(M{
+			"a": 1,
+		})
+
+		if m {
+			t.Error("Not filter does not reject")
+		}
+	})
 }
 
 func Assert(t *testing.T, e error) {
