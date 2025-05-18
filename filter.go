@@ -23,7 +23,7 @@ func NewFilter(filter any) (Filter, error) {
 	for key, value := range f {
 		switch key {
 		case "$and":
-			inner, err := newAndFilter(value, key)
+			inner, err := newAndFilter(value)
 			if err != nil {
 				return nil, err
 			}
@@ -36,34 +36,12 @@ func NewFilter(filter any) (Filter, error) {
 			}
 
 			filters[index] = inner
-		case "$eq":
-			filters[index] = anyFilter{Equal: true}
-		case "$ne":
-			filters[index] = anyFilter{Equal: false}
-		case "$gt":
-			fallthrough
-		case "$gte":
-			fallthrough
-		case "$lt":
-			fallthrough
-		case "$lte":
-			if n, ok := value.(int); ok {
-				filters[index] = numberToNumberFilter[int]{Target: n, Operation: key}
-				continue
+		default:
+			f, err := newWrappedFilter(key, value)
+			if err != nil {
+				return nil, err
 			}
-			if n, ok := value.(float32); ok {
-				filters[index] = numberToNumberFilter[float32]{Target: n, Operation: key}
-				continue
-			}
-			if n, ok := value.(float64); ok {
-				filters[index] = numberToNumberFilter[float64]{Target: n, Operation: key}
-				continue
-			}
-
-			err := fmt.Errorf("Expecting numeric operator target to be `int`, `float32`, `float64`, but got %s",
-				reflect.TypeOf(value).Kind().String())
-
-			return nil, err
+			filters[index] = f
 		}
 
 		index++
@@ -73,7 +51,7 @@ func NewFilter(filter any) (Filter, error) {
 }
 
 type wrappedFilter struct {
-	Path []string
+	Path   []string
 	Filter Filter
 }
 
@@ -82,8 +60,53 @@ func (f wrappedFilter) Match(document any) bool {
 	return f.Filter.Match(value)
 }
 
-func newWrappedFilter(filter any, path string) wrappedFilter {
+func newWrappedFilter(path string, filterMap any) (Filter, error) {
 	parts := strings.Split(path, ".")
+	f, isMap := filterMap.(map[string]any)
+	if !isMap {
+		return anyFilter{Path: parts, Equal: true, Target: filterMap}, nil
+	}
+	filters := make([]Filter, len(f))
+	index := 0
+	for key, value := range f {
+		var filter Filter
+		switch key {
+		case "$eq":
+			filter = anyFilter{Equal: true}
+		case "$ne":
+			filter = anyFilter{Equal: false}
+		case "$gt":
+			fallthrough
+		case "$gte":
+			fallthrough
+		case "$lt":
+			fallthrough
+		case "$lte":
+			if n, ok := value.(int); ok {
+				filter = numberToNumberFilter[int]{Target: n, Operation: key}
+				break
+			}
+			if n, ok := value.(float32); ok {
+				filter = numberToNumberFilter[float32]{Target: n, Operation: key}
+				break
+			}
+			if n, ok := value.(float64); ok {
+				filter = numberToNumberFilter[float64]{Target: n, Operation: key}
+				break
+			}
+
+			err := fmt.Errorf("Expecting numeric operator target to be `int`, `float32`, `float64`, but got %s",
+				reflect.TypeOf(value).Kind().String())
+
+			return nil, err
+		default:
+			err := fmt.Errorf("Filter %s not supported", key)
+			return nil, err
+		}
+		filters[index] = filter
+		index++
+	}
+	return wrappedFilter{Path: parts, Filter: andFilter{Filters: filters}}, nil
 }
 
 type andFilter struct {
@@ -104,7 +127,7 @@ func (f andFilter) Match(document any) bool {
 	return true
 }
 
-func newAndFilter(filter any, path ...string) (andFilter, error) {
+func newAndFilter(filter any) (andFilter, error) {
 	filters, err := newAndOrFilter(filter)
 
 	if err != nil {
@@ -160,7 +183,7 @@ func newAndOrFilter(filter any) ([]Filter, error) {
 }
 
 type anyFilter struct {
-	Path []string
+	Path   []string
 	Equal  bool
 	Target any
 }
