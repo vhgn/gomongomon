@@ -85,6 +85,27 @@ func TestFilter(t *testing.T) {
 			t.Error("Coult not match deep object")
 		}
 	})
+
+	t.Run("Exists filter", func(t *testing.T) {
+		f, e := gm.NewFilter(M{
+			"name": M{
+				"$exists": true,
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m := f.Match(M{
+			"name": "John",
+		})
+
+		if !m {
+			t.Error("Exists does not work")
+		}
+	})
 }
 
 func Assert(t *testing.T, e error) {
