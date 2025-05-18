@@ -85,6 +85,20 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 	for key, value := range f {
 		var filter Filter
 		switch key {
+		case "$all":
+			f, err := newArrayFilter(true, value)
+			if err != nil {
+				return nil, err
+			}
+
+			filter = f
+		case "$elemMatch":
+			f, err := newArrayFilter(false, value)
+			if err != nil {
+				return nil, err
+			}
+
+			filter = f
 		case "$not":
 			f, err := newWrappedFilter("", value)
 			if err != nil {
@@ -277,6 +291,46 @@ func (f existsFilter) Match(document any) bool {
 	}
 }
 
+type arrayFilter struct {
+	All    bool
+	Filter Filter
+}
+
+func (f arrayFilter) Match(document any) bool {
+	a, ok := document.([]any)
+	if !ok {
+		return false
+	}
+
+	if len(a) == 0 {
+		return f.All
+	}
+
+	for _, elem := range a {
+		m := f.Filter.Match(elem)
+		if f.All {
+			if !m {
+				return false
+			}
+		} else {
+			if m {
+				return true
+			}
+		}
+	}
+
+	return f.All
+}
+
+func newArrayFilter(all bool, filter any) (Filter, error) {
+	f, err := newWrappedFilter("", filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return arrayFilter{All: all, Filter: f}, nil
+}
+
 func newInFilter(in bool, values any) (Filter, error) {
 	v, ok := values.([]any)
 	if !ok {
@@ -318,9 +372,6 @@ func (f regexFilter) Match(document any) bool {
 
 	return f.Regex.MatchString(v)
 }
-
-// TODO
-// all
 
 type numeric interface {
 	int | float32 | float64

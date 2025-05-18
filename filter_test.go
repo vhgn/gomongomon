@@ -214,6 +214,79 @@ func TestFilter(t *testing.T) {
 			t.Error("Regex does not reject")
 		}
 	})
+
+	t.Run("Array filters work", func(t *testing.T) {
+		f, e := gm.NewFilter(M{
+			"tags": M{
+				"$all": M{
+					"$regex": "^a.*",
+				},
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m := f.Match(M{
+			"tags": A{
+				"a1",
+				"a2",
+			},
+		})
+
+		if !m {
+			t.Error("$all does not accept")
+		}
+
+		m = f.Match(M{
+			"tags": A{
+				"a1",
+				"b1",
+			},
+		})
+
+		if m {
+			t.Error("$all does not reject")
+		}
+
+		f, e = gm.NewFilter(M{
+			"tags": M{
+				"$elemMatch": M{
+					"$eq": "new",
+				},
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m = f.Match(M{
+			"tags": A{
+				"easy",
+				"current",
+				"new",
+			},
+		})
+
+		if !m {
+			t.Error("$elemMatch does not accept")
+		}
+
+		m = f.Match(M{
+			"tags": A{
+				"easy",
+				"current",
+			},
+		})
+
+		if m {
+			t.Error("$elemMatch does not reject")
+		}
+	})
 }
 
 func Assert(t *testing.T, e error) {
