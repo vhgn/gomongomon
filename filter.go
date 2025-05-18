@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -103,6 +104,17 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 				return nil, err
 			}
 			filter = f
+		case "$regex":
+			r, ok := value.(string)
+			if !ok {
+				err := fmt.Errorf("Expecting string for regex filter, got %s", reflect.TypeOf(value))
+				return nil, err
+			}
+			reg, err := regexp.Compile(r)
+			if err != nil {
+				return nil, err
+			}
+			filter = regexFilter{Regex: reg}
 		case "$eq":
 			filter = anyFilter{Equal: true, Target: value}
 		case "$ne":
@@ -294,8 +306,20 @@ func (f notFilter) Match(document any) bool {
 	return !m
 }
 
+type regexFilter struct {
+	Regex *regexp.Regexp
+}
+
+func (f regexFilter) Match(document any) bool {
+	v, ok := document.(string)
+	if !ok {
+		return false
+	}
+
+	return f.Regex.MatchString(v)
+}
+
 // TODO
-// regex
 // all
 
 type numeric interface {

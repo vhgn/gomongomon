@@ -185,6 +185,35 @@ func TestFilter(t *testing.T) {
 			t.Error("Not filter does not reject")
 		}
 	})
+
+	t.Run("Regex filter works", func(t *testing.T) {
+		f, e := gm.NewFilter(M{
+			"name": M{
+				"$regex": "^_.*",
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m := f.Match(M{
+			"name": "_abc",
+		})
+
+		if !m {
+			t.Error("Regex does not accept")
+		}
+
+		m = f.Match(M{
+			"name": "abc",
+		})
+
+		if m {
+			t.Error("Regex does not reject")
+		}
+	})
 }
 
 func Assert(t *testing.T, e error) {
