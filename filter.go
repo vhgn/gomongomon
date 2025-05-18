@@ -29,8 +29,15 @@ func NewFilter(filter any) (Filter, error) {
 			}
 
 			filters[index] = inner
+		case "$nor":
+			inner, err := newOrFilter(true, value)
+			if err != nil {
+				return nil, err
+			}
+
+			filters[index] = inner
 		case "$or":
-			inner, err := newOrFilter(value)
+			inner, err := newOrFilter(false, value)
 			if err != nil {
 				return nil, err
 			}
@@ -73,6 +80,18 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 	for key, value := range f {
 		var filter Filter
 		switch key {
+		case "$nin":
+			f, err := newInFilter(false, value)
+			if err != nil {
+				return nil, err
+			}
+			filter = f
+		case "$in":
+			f, err := newInFilter(true, value)
+			if err != nil {
+				return nil, err
+			}
+			filter = f
 		case "$eq":
 			filter = anyFilter{Equal: true, Target: value}
 		case "$ne":
@@ -148,27 +167,28 @@ func newAndFilter(filter any) (andFilter, error) {
 }
 
 type orFilter struct {
+	Invert  bool
 	Filters []Filter
 }
 
 func (f orFilter) Match(document any) bool {
 	for _, sub := range f.Filters {
 		if sub.Match(document) {
-			return true
+			return !f.Invert
 		}
 	}
 
-	return false
+	return f.Invert
 }
 
-func newOrFilter(filter any) (orFilter, error) {
+func newOrFilter(invert bool, filter any) (orFilter, error) {
 	filters, err := newAndOrFilter(filter)
 
 	if err != nil {
 		return orFilter{}, err
 	}
 
-	return orFilter{Filters: filters}, nil
+	return orFilter{Invert: invert, Filters: filters}, nil
 }
 
 func newAndOrFilter(filter any) ([]Filter, error) {
@@ -220,6 +240,30 @@ func (f existsFilter) Match(document any) bool {
 		return f.Exists
 	}
 }
+
+func newInFilter(in bool, values any) (Filter, error) {
+	v, ok := values.([]any)
+	if !ok {
+		err := fmt.Errorf("$in and $nin expect array values, got %s", reflect.TypeOf(values))
+		return nil, err
+	}
+
+	filters := make([]Filter, len(v))
+	for i, f := range v {
+		filters[i] = anyFilter{
+			Equal:  true,
+			Target: f,
+		}
+	}
+
+	f := orFilter{Filters: filters, Invert: !in}
+
+	return f, nil
+}
+
+// not nor
+// regex
+// all
 
 type numeric interface {
 	int | float32 | float64

@@ -106,6 +106,62 @@ func TestFilter(t *testing.T) {
 			t.Error("Exists does not work")
 		}
 	})
+
+	t.Run("In and Nin filter", func(t *testing.T) {
+		f, e := gm.NewFilter(M{
+			"name": M{
+				"$in": A{"John", "Jane"},
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m := f.Match(M{
+			"name": "John",
+		})
+
+		if !m {
+			t.Error("In does not match")
+		}
+
+		m = f.Match(M{
+			"name": "Jake",
+		})
+
+		if m {
+			t.Error("In does not reject")
+		}
+
+		f, e = gm.NewFilter(M{
+			"name": M{
+				"$nin": A{"Ash", "Zoe"},
+			},
+		})
+
+		if e != nil {
+			t.Log(e)
+			t.FailNow()
+		}
+
+		m = f.Match(M{
+			"name": "John",
+		})
+
+		if !m {
+			t.Error("Nin does not match")
+		}
+
+		m = f.Match(M{
+			"name": "Ash",
+		})
+
+		if m {
+			t.Error("Nin does not reject")
+		}
+	})
 }
 
 func Assert(t *testing.T, e error) {
