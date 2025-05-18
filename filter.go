@@ -64,7 +64,9 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 	parts := strings.Split(path, ".")
 	f, isMap := filterMap.(map[string]any)
 	if !isMap {
-		return anyFilter{Path: parts, Equal: true, Target: filterMap}, nil
+		target := filterMap
+		f := anyFilter{Equal: true, Target: target}
+		return wrappedFilter{Path: parts, Filter: f}, nil
 	}
 	filters := make([]Filter, len(f))
 	index := 0
@@ -72,9 +74,9 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 		var filter Filter
 		switch key {
 		case "$eq":
-			filter = anyFilter{Equal: true}
+			filter = anyFilter{Equal: true, Target: value}
 		case "$ne":
-			filter = anyFilter{Equal: false}
+			filter = anyFilter{Equal: false, Target: value}
 		case "$gt":
 			fallthrough
 		case "$gte":
@@ -99,6 +101,14 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 				reflect.TypeOf(value).Kind().String())
 
 			return nil, err
+		case "$exists":
+			if exists, ok := value.(bool); ok {
+				filter = existsFilter{Exists: exists}
+			} else {
+				err := fmt.Errorf("$exists should specify a boolean, specified %v", value)
+				return nil, err
+			}
+
 		default:
 			err := fmt.Errorf("Filter %s not supported", key)
 			return nil, err
@@ -183,20 +193,32 @@ func newAndOrFilter(filter any) ([]Filter, error) {
 }
 
 type anyFilter struct {
-	Path   []string
 	Equal  bool
 	Target any
 }
 
 func (f anyFilter) Match(document any) bool {
+	m := reflect.DeepEqual(document, f.Target)
 	switch f.Equal {
 	case true:
-		return document == f.Target
+		return m
 	case false:
-		return document != f.Target
+		return !m
 	}
 
 	return false
+}
+
+type existsFilter struct {
+	Exists bool
+}
+
+func (f existsFilter) Match(document any) bool {
+	if document == nil {
+		return !f.Exists
+	} else {
+		return f.Exists
+	}
 }
 
 type numeric interface {
@@ -217,6 +239,16 @@ func (f numberToNumberFilter[T]) Match(document any) bool {
 	a, ok := document.(int)
 	if ok {
 		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, float64(a))
+	}
+
+	b, ok := document.(float32)
+	if ok {
+		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, float64(b))
+	}
+
+	c, ok := document.(float64)
+	if ok {
+		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, c)
 	}
 
 	return false
