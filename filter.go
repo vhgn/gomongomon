@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Filter interface {
@@ -151,6 +152,10 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 				filter = numberToNumberFilter[int]{Target: n, Operation: key}
 				break
 			}
+			if n, ok := value.(int64); ok {
+				filter = numberToNumberFilter[int64]{Target: n, Operation: key}
+				break
+			}
 			if n, ok := value.(float32); ok {
 				filter = numberToNumberFilter[float32]{Target: n, Operation: key}
 				break
@@ -158,6 +163,9 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 			if n, ok := value.(float64); ok {
 				filter = numberToNumberFilter[float64]{Target: n, Operation: key}
 				break
+			}
+			if n, ok := value.(time.Time); ok {
+				filter = numberToNumberFilter[int64]{Target: n.Unix(), Operation: key}
 			}
 
 			err := fmt.Errorf("Expecting numeric operator target to be `int`, `float32`, `float64`, but got %s",
@@ -397,7 +405,7 @@ func (f regexFilter) Match(document any) bool {
 }
 
 type numeric interface {
-	int | float32 | float64
+	int | int64 | float32 | float64
 }
 
 type numberToNumberFilter[T numeric] struct {
@@ -424,6 +432,16 @@ func (f numberToNumberFilter[T]) Match(document any) bool {
 	c, ok := document.(float64)
 	if ok {
 		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, c)
+	}
+
+	d, ok := document.(int64)
+	if ok {
+		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, float64(d))
+	}
+
+	e, ok := document.(time.Time)
+	if ok {
+		return matchNumeric(numberToNumberFilter[float64]{Operation: f.Operation, Target: float64(f.Target)}, float64(e.Unix()))
 	}
 
 	return false
