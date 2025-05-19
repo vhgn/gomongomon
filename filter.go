@@ -166,6 +166,7 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 			}
 			if n, ok := value.(time.Time); ok {
 				filter = numberToNumberFilter[int64]{Target: n.Unix(), Operation: key}
+				break
 			}
 
 			err := fmt.Errorf("Expecting numeric operator target to be `int`, `float32`, `float64`, but got %s",
