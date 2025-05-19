@@ -1,7 +1,7 @@
 package gomongomon_test
 
 import (
-	gm "gomongomon"
+	gm "github.com/vhgn/gomongomon"
 	"testing"
 )
 
@@ -24,8 +24,9 @@ func TestFilter(t *testing.T) {
 			t.FailNow()
 		}
 
+		a := 17.5
 		m := f.Match(M{
-			"age":    17.5,
+			"age":    &a,
 			"height": 170,
 		})
 

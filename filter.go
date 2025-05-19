@@ -414,6 +414,14 @@ type numberToNumberFilter[T numeric] struct {
 }
 
 func (f numberToNumberFilter[T]) Match(document any) bool {
+	v := reflect.ValueOf(document)
+	if v.Kind() == reflect.Ptr {
+		if !v.IsValid() {
+			return false
+		}
+		return f.Match(v.Elem().Interface())
+	}
+
 	n, ok := document.(T)
 	if ok {
 		return matchNumeric(f, n)
