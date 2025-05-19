@@ -1,5 +1,3 @@
-module gomongomon
+module github.com/vhgn/gomongomon
 
 go 1.24.2
-
-require go.mongodb.org/mongo-driver v1.17.3
