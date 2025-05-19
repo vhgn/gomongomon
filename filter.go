@@ -129,6 +129,13 @@ func newWrappedFilter(path string, filterMap any) (Filter, error) {
 				return nil, err
 			}
 			filter = regexFilter{Regex: reg}
+		case "$type":
+			t, ok := value.(string)
+			if !ok {
+				err := fmt.Errorf("$type filter value should be string")
+				return nil, err
+			}
+			filter = typeFilter{Type: t}
 		case "$eq":
 			filter = anyFilter{Equal: true, Target: value}
 		case "$ne":
@@ -277,6 +284,22 @@ func (f anyFilter) Match(document any) bool {
 	}
 
 	return false
+}
+
+type typeFilter struct {
+	Type string
+}
+
+func (f typeFilter) Match(document any) bool {
+	switch f.Type {
+	case "null":
+		return document == nil
+	case "string":
+		_, ok := document.(string)
+		return ok
+	default:
+		return false
+	}
 }
 
 type existsFilter struct {
